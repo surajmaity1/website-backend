@@ -1,3 +1,4 @@
+import { NextFunction } from "express";
 import {
   REQUEST_LOG_TYPE,
   LOG_ACTION,
@@ -9,15 +10,19 @@ import {
   ERROR_WHILE_UPDATING_REQUEST,
   REQUEST_APPROVED_SUCCESSFULLY,
   REQUEST_REJECTED_SUCCESSFULLY,
+  UNAUTHORIZED_TO_ACKNOWLEDGE_OOO_REQUEST,
 } from "../constants/requests";
 import { statusState } from "../constants/userStatus";
 import { addLog } from "../models/logs";
 import { createRequest, getRequestByKeyValues, getRequests, updateRequest } from "../models/requests";
 import { createUserFutureStatus } from "../models/userFutureStatus";
 import { addFutureStatus } from "../models/userStatus";
+import { acknowledgeOOORequest } from "../services/oooRequest";
 import { CustomResponse } from "../typeDefinitions/global";
-import { OooRequestCreateRequest, OooStatusRequest } from "../types/oooRequest";
+import { AcknowledgeOOORequest, OooRequestCreateRequest, OooRequestResponse, OooStatusRequest } from "../types/oooRequest";
 import { UpdateRequest } from "../types/requests";
+import firestore from "../utils/firestore";
+const requestModel = firestore.collection("requests");
 
 export const createOooRequestController = async (req: OooRequestCreateRequest, res: CustomResponse) => {
   const requestBody = req.body;
@@ -118,5 +123,39 @@ export const updateOooRequestController = async (req: UpdateRequest, res: Custom
   } catch (err) {
     logger.error(ERROR_WHILE_UPDATING_REQUEST, err);
     return res.boom.badImplementation(ERROR_WHILE_UPDATING_REQUEST);
+  }
+};
+
+export const acknowledgeOOORequestController = async (
+  req: AcknowledgeOOORequest,
+  res: OooRequestResponse,
+  next: NextFunction,
+)
+  : Promise<OooRequestResponse> => {
+
+    const dev = req.query.dev === "true";
+
+    if(!dev) return res.boom.notImplemented("Feature not implemented");
+
+    const requestBody = req.body;
+    const userId = req?.userData?.id;
+    const requestId = req.params.id;
+    const isSuperuser = req?.userData?.roles?.super_user === true;
+
+    if (isSuperuser === false) {
+      return res.boom.unauthorized(UNAUTHORIZED_TO_ACKNOWLEDGE_OOO_REQUEST);
+    }
+
+    try {
+
+      const response = acknowledgeOOORequest(requestId, requestBody, userId);
+
+      return res.status(201).json({
+              message: (await response).message,
+      });
+    }
+    catch(error){
+      logger.error(ERROR_WHILE_UPDATING_REQUEST, error);
+      next(error);
   }
 };
