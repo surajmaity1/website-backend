@@ -12,14 +12,14 @@ import { userState } from "../constants/userStatus";
 import { createRequest, getRequestByKeyValues } from "../models/requests";
 import { getUserStatus } from "../models/userStatus";
 import { OooStatusRequest, OooStatusRequestBody } from "../types/oooRequest";
+import { currentStatus } from "../types/userCurrentStatus";
 import { addLog } from "./logService";
 import { NotFound, Forbidden, Conflict } from "http-errors";
 
-export const validateOOOCreateRequest = async (
+export const validateUserStatus = async (
     userId: string,
     userStatusExists: boolean,
-    userStatus: any,
-    latestOOORequest: OooStatusRequest,
+    userStatus: { currentStatus },
 ) => {
     try {
 
@@ -34,14 +34,6 @@ export const validateOOOCreateRequest = async (
                 { message: OOO_STATUS_ALREADY_EXIST }
             );
             throw Forbidden(OOO_STATUS_ALREADY_EXIST);
-        }
-
-        if (latestOOORequest) {
-            await addLog(logType.REQUEST_ALREADY_PENDING,
-                { userId, oooRequestId: latestOOORequest.id },
-                { message: REQUEST_ALREADY_PENDING }
-            );
-            throw Conflict(REQUEST_ALREADY_PENDING);
         }
     } catch (error) {
         logger.error("Error while validating OOO create request", error);
@@ -58,20 +50,28 @@ export const createOOORequest = async (
 
         const { data: userStatus, userStatusExists } = await getUserStatus(userId);
 
+        await validateUserStatus(userId, userStatusExists, userStatus);
+
         const latestOOORequest: OooStatusRequest = await getRequestByKeyValues({
             userId: userId,
             type: REQUEST_TYPE.OOO,
             status: REQUEST_STATE.PENDING,
         });
 
-        await validateOOOCreateRequest(userId, userStatusExists, userStatus, latestOOORequest);
+        if (latestOOORequest) {
+            await addLog(logType.REQUEST_ALREADY_PENDING,
+                { userId, oooRequestId: latestOOORequest.id },
+                { message: REQUEST_ALREADY_PENDING }
+            );
+            throw Conflict(REQUEST_ALREADY_PENDING);
+        }
 
         const requestResult: OooStatusRequest = await createRequest({
             from: body.from,
             until: body.until,
             type: body.type,
             requestedBy: username,
-            userId: userId,
+            userId,
             reason: body.reason,
             comment: null,
             status: REQUEST_STATE.PENDING,
