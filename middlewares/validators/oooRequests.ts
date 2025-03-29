@@ -67,6 +67,6 @@ export const acknowledgeOOORequestsValidator = async (
   } catch (error) {
     const errorMessages = error.details.map((detail:any) => detail.message);
     logger.error(`Error while validating request payload : ${errorMessages}`);
-    res.boom.badRequest(errorMessages);
+    return res.boom.badRequest(errorMessages);
   }
 };
