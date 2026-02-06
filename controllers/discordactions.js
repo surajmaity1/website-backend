@@ -505,6 +505,7 @@ const generateInviteForUser = async (req, res) => {
 
     const inviteOptions = {
       channelId: channelId,
+      role: req.approvedApplicationRole,
     };
     const response = await fetch(`${DISCORD_BASE_URL}/invite`, {
       method: "POST",
