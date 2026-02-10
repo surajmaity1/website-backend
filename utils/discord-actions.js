@@ -55,10 +55,7 @@ const generateDiscordInviteLink = async () => {
     const response = await fetch(`${DISCORD_BASE_URL}/invite`, {
       method: "POST",
       body: JSON.stringify(inviteOptions),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authToken}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
     });
     if (!response.ok) {
       const error = await response.json();
