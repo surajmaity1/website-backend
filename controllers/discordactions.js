@@ -7,6 +7,7 @@ const discordServices = require("../services/discordService");
 const { fetchAllUsers, fetchUser } = require("../models/users");
 const { generateCloudFlareHeaders } = require("../utils/discord-actions");
 const { addLog } = require("../models/logs");
+const logger = require("../utils/logger");
 const discordDeveloperRoleId = config.get("discordDeveloperRoleId");
 const discordMavenRoleId = config.get("discordMavenRoleId");
 
@@ -23,7 +24,8 @@ const DISCORD_BASE_URL = config.get("services.discordBot.baseUrl");
 
 const createGroupRole = async (req, res) => {
   try {
-    const rolename = `group-${req.body.rolename}`;
+    const { role = false } = req.query;
+    const rolename = role ? req.body.rolename : `group-${req.body.rolename}`;
 
     const { roleExists } = await discordRolesModel.isGroupRoleExists({ rolename });
 
