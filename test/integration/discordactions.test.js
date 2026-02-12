@@ -1541,7 +1541,7 @@ describe("Discord actions", function () {
         });
     });
 
-    it("should handle string 'true' and 'false' as boolean values", function (done) {
+    it("should handle string 'true' as true boolean value", function (done) {
       const roleData = {
         rolename: "testrole",
         description: "Test role",
@@ -1557,8 +1557,6 @@ describe("Discord actions", function () {
             return done(err);
           }
           expect(res).to.have.status(201);
-
-          // Verify role was created without prefix
           const fetchCall = fetchStub.getCall(0);
           const requestBody = JSON.parse(fetchCall.args[1].body);
           expect(requestBody.rolename).to.equal("testrole");

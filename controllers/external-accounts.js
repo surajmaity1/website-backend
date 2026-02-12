@@ -79,8 +79,7 @@ const linkExternalAccount = async (req, res) => {
     );
 
     if (!unverifiedRoleRemovalResponse.success) {
-      const message = `Unverified role removal failed. Please contact admin`;
-      return res.boom.internal(message, { message });
+      return res.boom.internal(null, { message: "Unverified role removal failed. Please contact admin" });
     }
 
     return res.status(200).json({ message: "Your discord profile has been linked successfully" });

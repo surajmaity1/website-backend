@@ -7,7 +7,6 @@ const discordServices = require("../services/discordService");
 const { fetchAllUsers, fetchUser } = require("../models/users");
 const { generateCloudFlareHeaders } = require("../utils/discord-actions");
 const { addLog } = require("../models/logs");
-const logger = require("../utils/logger");
 const discordDeveloperRoleId = config.get("discordDeveloperRoleId");
 const discordMavenRoleId = config.get("discordMavenRoleId");
 
