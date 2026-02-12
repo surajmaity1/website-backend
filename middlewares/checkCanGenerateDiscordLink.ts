@@ -29,7 +29,7 @@ const checkCanGenerateDiscordLink = async (req: CustomRequest, res: CustomRespon
     }
 
     if (approvedApplication.isNew !== true || !approvedApplication.role) {
-      return res.boom.forbidden("Your are not eligible to generate a Discord invite link.");
+      return res.boom.forbidden("You are not eligible to generate a Discord invite link.");
     }
 
     req.approvedApplicationRole = approvedApplication.role;
