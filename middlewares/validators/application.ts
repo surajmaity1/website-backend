@@ -31,7 +31,7 @@ const validateApplicationData = async (req: CustomRequest, res: CustomResponse, 
       userId: joi.string().optional(),
       firstName: joi.string().min(1).required(),
       lastName: joi.string().min(1).required(),
-      college: joi.string().min(1).required(),
+      institution: joi.string().min(1).required(),
       skills: joi.string().min(5).required(),
       city: joi.string().min(1).required(),
       state: joi.string().min(1).required(),
@@ -130,6 +130,15 @@ const validateApplicationUpdateData = async (req: CustomRequest, res: CustomResp
     .strict()
     .min(1)
     .keys({
+      institution: joi.string().min(1).optional(),
+      skills: joi.string().min(5).optional(),
+      city: joi.string().min(1).optional(),
+      state: joi.string().min(1).optional(),
+      country: joi.string().min(1).optional(),
+      role: joi
+        .string()
+        .valid(...Object.values(APPLICATION_ROLES))
+        .optional(),
       imageUrl: joi.string().uri().optional(),
       foundFrom: joi.string().min(1).optional(),
       introduction: joi.string().min(1).optional(),

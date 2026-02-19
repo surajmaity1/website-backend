@@ -12,7 +12,7 @@ const applicationModel = require("../../models/applications");
 
 const applicationsData = require("../fixtures/applications/applications")();
 const cookieName = config.get("userToken.cookieName");
-const { APPLICATION_ERROR_MESSAGES, API_RESPONSE_MESSAGES } = require("../../constants/application");
+const { APPLICATION_ERROR_MESSAGES, API_RESPONSE_MESSAGES, APPLICATION_SCORE } = require("../../constants/application");
 
 const appOwner = userData[3];
 const superUser = userData[4];
@@ -334,25 +334,27 @@ describe("Application", function () {
   });
 
   describe("POST /applications", function () {
-    it("should create a application and return 201 if the user has not yet submitted the application", function (done) {
-      chai
+    it("should create a application and return 201 if the user has not yet submitted the application", async function () {
+      const res = await chai
         .request(app)
         .post(`/applications`)
         .set("cookie", `${cookieName}=${secondUserJwt}`)
         .send({
           ...applicationsData[5],
           imageUrl: "https://example.com/image.jpg",
-        })
-        .end((err, res) => {
-          if (err) {
-            return done(err);
-          }
-
-          expect(res).to.have.status(201);
-          expect(res.body.message).to.be.equal("Application created successfully");
-          expect(res.body).to.have.property("applicationId");
-          return done();
         });
+
+      expect(res).to.have.status(201);
+      expect(res.body.message).to.be.equal("Application created successfully");
+      expect(res.body).to.have.property("applicationId");
+
+      const getRes = await chai
+        .request(app)
+        .get(`/applications/${res.body.applicationId}`)
+        .set("cookie", `${cookieName}=${superUserJwt}`);
+
+      expect(getRes).to.have.status(200);
+      expect(getRes.body.application.score).to.be.equal(50);
     });
   });
 
@@ -500,6 +502,48 @@ describe("Application", function () {
       expect(secondRes).to.have.status(409);
       expect(secondRes.body.error).to.be.equal("Conflict");
       expect(secondRes.body.message).to.be.equal(APPLICATION_ERROR_MESSAGES.EDIT_TOO_SOON);
+    });
+
+    it("should return 200 when updating city, state, and country", async function () {
+      const applicationData = { ...applicationsData[0], userId };
+      const testApplicationId = await applicationModel.addApplication(applicationData);
+
+      const res = await chai
+        .request(app)
+        .patch(`/applications/${testApplicationId}`)
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send({ city: "New Delhi", state: "Delhi", country: "India" });
+
+      expect(res).to.have.status(200);
+      expect(res.body.message).to.be.equal("Application updated successfully");
+    });
+
+    it("should return 200 when updating role with a valid role", async function () {
+      const applicationData = { ...applicationsData[0], userId };
+      const testApplicationId = await applicationModel.addApplication(applicationData);
+
+      const res = await chai
+        .request(app)
+        .patch(`/applications/${testApplicationId}`)
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send({ role: "designer" });
+
+      expect(res).to.have.status(200);
+      expect(res.body.message).to.be.equal("Application updated successfully");
+    });
+
+    it("should return 400 when updating role with an invalid role", async function () {
+      const applicationData = { ...applicationsData[0], userId };
+      const testApplicationId = await applicationModel.addApplication(applicationData);
+
+      const res = await chai
+        .request(app)
+        .patch(`/applications/${testApplicationId}`)
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send({ role: "invalid_role" });
+
+      expect(res).to.have.status(400);
+      expect(res.body.error).to.be.equal("Bad Request");
     });
   });
 
@@ -800,7 +844,7 @@ describe("Application", function () {
     let nudgeApplicationId: string;
 
     beforeEach(async function () {
-      const applicationData = { ...applicationsData[0], userId };
+      const applicationData = { ...applicationsData[0], userId, score: APPLICATION_SCORE.INITIAL_SCORE };
       nudgeApplicationId = await applicationModel.addApplication(applicationData);
     });
 
@@ -820,6 +864,7 @@ describe("Application", function () {
           expect(res.body.message).to.be.equal(API_RESPONSE_MESSAGES.NUDGE_SUCCESS);
           expect(res.body.nudgeCount).to.be.equal(1);
           expect(res.body.lastNudgeAt).to.be.a("string");
+          expect(res.body.score).to.be.equal(APPLICATION_SCORE.INITIAL_SCORE + APPLICATION_SCORE.NUDGE_BONUS);
           done();
         });
     });
@@ -834,6 +879,7 @@ describe("Application", function () {
 
           expect(res).to.have.status(200);
           expect(res.body.nudgeCount).to.be.equal(1);
+          expect(res.body.score).to.be.equal(APPLICATION_SCORE.INITIAL_SCORE + APPLICATION_SCORE.NUDGE_BONUS);
 
           const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
           applicationModel
@@ -856,6 +902,7 @@ describe("Application", function () {
                   expect(res.body.message).to.be.equal(API_RESPONSE_MESSAGES.NUDGE_SUCCESS);
                   expect(res.body.nudgeCount).to.be.equal(2);
                   expect(res.body.lastNudgeAt).to.be.a("string");
+                  expect(res.body.score).to.be.equal(APPLICATION_SCORE.INITIAL_SCORE + 2 * APPLICATION_SCORE.NUDGE_BONUS);
                   done();
                 });
             })

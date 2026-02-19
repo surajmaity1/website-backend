@@ -140,7 +140,7 @@ describe("createApplicationService", () => {
 
       const applicationData = addApplicationStub.getCall(0).args[0];
       expect(applicationData.isNew).to.equal(true);
-      expect(applicationData.score).to.equal(0);
+      expect(applicationData.score).to.equal(50);
       expect(applicationData.status).to.equal(APPLICATION_STATUS_TYPES.PENDING);
       expect(applicationData.nudgeCount).to.equal(0);
     });
@@ -186,7 +186,7 @@ describe("createApplicationService", () => {
       expect(applicationData.location.city).to.equal(mockPayload.city);
       expect(applicationData.location.state).to.equal(mockPayload.state);
       expect(applicationData.location.country).to.equal(mockPayload.country);
-      expect(applicationData.professional.institution).to.equal(mockPayload.college);
+      expect(applicationData.professional.institution).to.equal(mockPayload.institution);
       expect(applicationData.professional.skills).to.equal(mockPayload.skills);
       expect(applicationData.intro.introduction).to.equal(mockPayload.introduction);
       expect(applicationData.intro.funFact).to.equal(mockPayload.funFact);

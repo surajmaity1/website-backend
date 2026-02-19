@@ -60,7 +60,7 @@ export type applicationPayload = {
   city: string;
   state: string;
   country: string;
-  college: string;
+  institution: string;
   skills: string;
   introduction: string;
   funFact: string;
@@ -74,6 +74,12 @@ export type applicationPayload = {
 };
 
 export type applicationUpdatePayload = {
+  city?: string;
+  state?: string;
+  country?: string;
+  institution?: string;
+  skills?: string;
+  role?: ApplicationRole;
   imageUrl?: string;
   foundFrom?: string;
   introduction?: string;
