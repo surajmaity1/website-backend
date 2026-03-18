@@ -1,6 +1,11 @@
 const chai = require("chai");
 const { expect } = chai;
-const { generateNewStatus, checkIfUserHasLiveTasks, convertTimestampsToUTC } = require("../../../utils/userStatus");
+const {
+  generateNewStatus,
+  checkIfUserHasLiveTasks,
+  convertTimestampsToUTC,
+  computeIdleDaysExcludingOOO,
+} = require("../../../utils/userStatus");
 const { userState } = require("../../../constants/userStatus");
 const {
   OutputFixtureForFnConvertTimestampsToUTC,
@@ -100,6 +105,83 @@ describe("User Status Functions", function () {
     it("should convert timestamps within the input object to UTC 00:00:00 (start of day) and UTC 23:59:59 (end of day)", function () {
       const result = convertTimestampsToUTC(inputFixtureForFnConvertTimestampsToUTC);
       expect(result).to.deep.equal(OutputFixtureForFnConvertTimestampsToUTC);
+    });
+  });
+
+  describe("computeIdleDaysExcludingOOO", function () {
+    const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+    it("should return total idle days when no OOO period", function () {
+      const windowStart = Date.now() - 10 * ONE_DAY_MS;
+      const now = Date.now();
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now);
+      expect(days).to.equal(10);
+    });
+
+    it("should exclude OOO periods from idle days", function () {
+      const now = Date.now();
+      const windowStart = now - 15 * ONE_DAY_MS;
+      const oooPeriods = [{ from: now - 10 * ONE_DAY_MS, until: now - 5 * ONE_DAY_MS }];
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now, oooPeriods);
+      expect(days).to.equal(10);
+    });
+
+    it("should fall back to currentStatusFrom when idleFrom is missing", function () {
+      const currentStatusFrom = Date.now() - 8 * ONE_DAY_MS;
+      const now = Date.now();
+      const days = computeIdleDaysExcludingOOO(null, currentStatusFrom, now);
+      expect(days).to.equal(8);
+    });
+
+    it("should return 0 when window has no span", function () {
+      const now = Date.now();
+      const days = computeIdleDaysExcludingOOO(now, null, now);
+      expect(days).to.equal(0);
+    });
+
+    it("should return 0 when window start is in the future (edge case)", function () {
+      const now = Date.now();
+      const futureStart = now + 5 * ONE_DAY_MS;
+      const days = computeIdleDaysExcludingOOO(futureStart, null, now);
+      expect(days).to.equal(0);
+    });
+
+    it("should subtract multiple OOO periods", function () {
+      const now = Date.now();
+      const windowStart = now - 20 * ONE_DAY_MS;
+      const oooPeriods = [
+        { from: now - 18 * ONE_DAY_MS, until: now - 16 * ONE_DAY_MS }, // 2 days
+        { from: now - 10 * ONE_DAY_MS, until: now - 7 * ONE_DAY_MS }, // 3 days
+      ];
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now, oooPeriods);
+      expect(days).to.equal(15);
+    });
+
+    it("should handle overlapping OOO periods without double subtracting", function () {
+      const now = Date.now();
+      const windowStart = now - 20 * ONE_DAY_MS;
+      const oooPeriods = [
+        { from: now - 12 * ONE_DAY_MS, until: now - 8 * ONE_DAY_MS },
+        { from: now - 10 * ONE_DAY_MS, until: now - 6 * ONE_DAY_MS },
+      ];
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now, oooPeriods);
+      expect(days).to.equal(12);
+    });
+
+    it("should handle OOO period partially outside window", function () {
+      const now = Date.now();
+      const windowStart = now - 10 * ONE_DAY_MS;
+      const oooPeriods = [{ from: now - 15 * ONE_DAY_MS, until: now - 7 * ONE_DAY_MS }];
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now, oooPeriods);
+      expect(days).to.equal(7);
+    });
+
+    it("should return full idle days when OOO period is outside window", function () {
+      const now = Date.now();
+      const windowStart = now - 10 * ONE_DAY_MS;
+      const oooPeriods = [{ from: now - 20 * ONE_DAY_MS, until: now - 15 * ONE_DAY_MS }];
+      const days = computeIdleDaysExcludingOOO(windowStart, null, now, oooPeriods);
+      expect(days).to.equal(10);
     });
   });
 });

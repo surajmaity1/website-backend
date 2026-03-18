@@ -564,7 +564,7 @@ describe("Task Based Status Updates", function () {
         .send(reqBody);
       expect(res.status).to.equal(204);
       const userStatus002Data = (await userStatusModel.doc("userStatusDoc001").get()).data();
-      expect(userStatus002Data).to.have.keys(["userId", "currentStatus"]);
+      expect(userStatus002Data).to.include.keys("userId", "currentStatus");
       expect(userStatus002Data.currentStatus.state).to.equal(userState.IDLE);
     });
 
@@ -582,8 +582,93 @@ describe("Task Based Status Updates", function () {
         .send(reqBody);
       expect(res.status).to.equal(204);
       const userStatus002Data = (await userStatusModel.doc("userStatusDoc001").get()).data();
-      expect(userStatus002Data).to.have.keys(["userId", "currentStatus"]);
+      expect(userStatus002Data).to.include.keys("userId", "currentStatus");
       expect(userStatus002Data.currentStatus.state).to.equal(userState.ACTIVE);
+    });
+  });
+
+  describe("idleFrom field lifecycle", function () {
+    let userId;
+    let superUserId;
+    let userJwt;
+    let taskArr;
+
+    beforeEach(async function () {
+      userId = await addUser(userData[6]);
+      superUserId = await addUser(userData[4]);
+      userJwt = authService.generateAuthToken({ userId });
+      taskArr = allTasks();
+      const sampleTask1 = taskArr[0];
+      sampleTask1.assignee = userId;
+      sampleTask1.createdBy = superUserId;
+      await firestore.collection("tasks").doc("taskid-idle-window-1").set(sampleTask1);
+    });
+
+    afterEach(async function () {
+      await cleanDb();
+    });
+
+    it("should set idleFrom when user transitions ACTIVE → IDLE (task completed)", async function () {
+      const activeStatusData = generateStatusDataForState(userId, userState.ACTIVE);
+      await firestore.collection("usersStatus").doc("userStatusIdleWindow").set(activeStatusData);
+
+      const beforeMs = Date.now();
+      const res = await chai
+        .request(app)
+        .patch(`/tasks/self/taskid-idle-window-1`)
+        .set("cookie", `${cookieName}=${userJwt}`)
+        .send({ status: "COMPLETED", percentCompleted: 100 });
+
+      expect(res.body.userStatus.data.currentStatus).to.equal(userState.IDLE);
+
+      const doc = await firestore.collection("usersStatus").doc("userStatusIdleWindow").get();
+      const idleFrom = doc.data().idleFrom;
+      expect(idleFrom).to.be.a("number");
+      expect(idleFrom).to.be.at.least(beforeMs);
+    });
+
+    it("should clear idleFrom when user transitions IDLE → ACTIVE (new task assigned)", async function () {
+      const idleStatusData = {
+        ...generateStatusDataForState(userId, userState.IDLE),
+        idleFrom: Date.now() - 5 * 24 * 60 * 60 * 1000, // 5 days ago
+      };
+      await firestore.collection("usersStatus").doc("userStatusIdleWindow").set(idleStatusData);
+
+      const sampleTask2 = taskArr[1];
+      sampleTask2.assignee = userId;
+      sampleTask2.createdBy = superUserId;
+      await firestore.collection("tasks").doc("taskid-idle-window-2").set(sampleTask2);
+
+      const superUserJwt = authService.generateAuthToken({ userId: superUserId });
+      await chai
+        .request(app)
+        .patch(`/tasks/taskid-idle-window-1`)
+        .set("cookie", `${cookieName}=${superUserJwt}`)
+        .send({ assignee: userData[6].username });
+
+      const doc = await firestore.collection("usersStatus").doc("userStatusIdleWindow").get();
+      expect(doc.data().currentStatus.state).to.equal(userState.ACTIVE);
+      expect(doc.data().idleFrom).to.equal(null);
+    });
+
+    it("should NOT update idleFrom when user is already IDLE (no duplicate reset)", async function () {
+      const existingIdleWindowTs = Date.now() - 3 * 24 * 60 * 60 * 1000; // 3 days ago
+      const alreadyIdleData = {
+        ...generateStatusDataForState(userId, userState.IDLE),
+        idleFrom: existingIdleWindowTs,
+      };
+      await firestore.collection("usersStatus").doc("userStatusIdleWindow").set(alreadyIdleData);
+
+      const res = await chai
+        .request(app)
+        .patch(`/tasks/self/taskid-idle-window-1`)
+        .set("cookie", `${cookieName}=${userJwt}`)
+        .send({ status: "COMPLETED", percentCompleted: 100 });
+
+      expect(res.body.userStatus.message).to.equal("The status is already IDLE");
+
+      const doc = await firestore.collection("usersStatus").doc("userStatusIdleWindow").get();
+      expect(doc.data().idleFrom).to.equal(existingIdleWindowTs);
     });
   });
 });
